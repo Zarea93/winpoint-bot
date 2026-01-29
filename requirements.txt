@@ -1,1 +1,2 @@
-MTQ2NjMzNjk5MDEyNjQwNzczMQ.GXzh_x.8Aq-22GURCWlO5ph_sntemgpYq87iXXe0UrT2w
+discord.py
+requests
