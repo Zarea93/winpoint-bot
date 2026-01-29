@@ -3,19 +3,20 @@ import requests
 import asyncio
 import os
 
-# Čitanje tokena i channel ID iz Environment Variables
+# Čitanje tokena i channel ID
 TOKEN = os.getenv("TOKEN")
 channel_id_env = os.getenv("CHANNEL_ID")
 
+# Provera da li su postavljene
 if not TOKEN:
-    raise ValueError("TOKEN nije postavljen u Environment Variables!")
+    print("GREŠKA: TOKEN nije postavljen u Environment Variables!")
 if not channel_id_env:
-    raise ValueError("CHANNEL_ID nije postavljen u Environment Variables!")
+    print("GREŠKA: CHANNEL_ID nije postavljen u Environment Variables!")
 
 try:
     CHANNEL_ID = int(channel_id_env)
-except ValueError:
-    raise ValueError("CHANNEL_ID mora biti broj!")
+except (TypeError, ValueError):
+    print("GREŠKA: CHANNEL_ID mora biti broj!")
 
 URL = "https://winpoint.gg"
 
@@ -35,8 +36,6 @@ async def on_ready():
 
 async def check():
     global old_page
-
-    # Čekanje dok bot ne učita kanal
     await client.wait_until_ready()
     channel = client.get_channel(CHANNEL_ID)
     if channel is None:
@@ -45,12 +44,12 @@ async def check():
 
     while True:
         page = get_page()
-
         if old_page and page != old_page:
             await channel.send("@everyone 🆕 New matches are added on winpoint.gg")
-
         old_page = page
         await asyncio.sleep(60)
 
-# Pokretanje bota
-client.run(TOKEN)
+if TOKEN and channel_id_env:
+    client.run(TOKEN)
+else:
+    print("Bot neće startovati dok se ne unesu TOKEN i CHANNEL_ID")
