@@ -1,11 +1,14 @@
 import discord
 from discord.ext import tasks
 import aiohttp
+import os
 
-# --- OVDE DIREKTNO UPIŠI ---
-TOKEN = "MTQ2NjMzNjk5MDEyNjQwNzczMQ.GDcRPU.lfvPqspEXkLwAl9eIiKF5oiXlBkgVmgNfXjxJs"
-CHANNEL_ID = 123456789012345678  # 1365627989987033098
-# ---------------------------
+# ČITANJE PODATAKA IZ RAILWAY-A (Ne diraj ovo)
+TOKEN = os.getenv("TOKEN")
+try:
+    CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
+except:
+    CHANNEL_ID = None
 
 class WinpointBot(discord.Client):
     def __init__(self):
@@ -18,12 +21,16 @@ class WinpointBot(discord.Client):
         self.check_site.start()
 
     async def on_ready(self):
-        print(f'USPEH! Bot je online kao: {self.user}')
+        print(f'STATUS: Bot je uspesno povezan kao {self.user}')
 
     @tasks.loop(minutes=5)
     async def check_site(self):
+        if not self.is_ready() or not CHANNEL_ID:
+            return
         channel = self.get_channel(CHANNEL_ID)
-        if not channel: return
+        if not channel:
+            print(f"GRESKA: Kanal sa ID {CHANNEL_ID} nije pronadjen!")
+            return
         try:
             headers = {"User-Agent": "Mozilla/5.0"}
             async with aiohttp.ClientSession() as session:
@@ -32,10 +39,13 @@ class WinpointBot(discord.Client):
                         text = await resp.text()
                         curr_hash = hash(text)
                         if self.old_hash is not None and curr_hash != self.old_hash:
-                            await channel.send("🆕 **New matches are added on winpoint.gg!** @everyone")
+                            await channel.send("🆕 **Novi mečevi na winpoint.gg!** @everyone")
                         self.old_hash = curr_hash
-        except:
-            pass
+        except Exception as e:
+            print(f"Greska pri proveri sajta: {e}")
 
 bot = WinpointBot()
-bot.run(TOKEN)
+if TOKEN:
+    bot.run(TOKEN)
+else:
+    print("FATALNA GRESKA: TOKEN varijabla nije pronadjena u Railway panelu!")
