@@ -1,85 +1,93 @@
 import discord
-import requests
+import aiohttp
 import asyncio
 import os
 
 # ------------------------------
-# Čitanje env varijabli
+# Konfiguracija
 # ------------------------------
 TOKEN = os.getenv("TOKEN")
 CHANNEL_ID_ENV = os.getenv("CHANNEL_ID")
+URL = "https://winpoint.gg"
 
-# Provera da li su setovane
-if not TOKEN:
-    raise RuntimeError("TOKEN nije postavljen u Environment Variables!")
-
-if not CHANNEL_ID_ENV:
-    raise RuntimeError("CHANNEL_ID nije postavljen u Environment Variables!")
+if not TOKEN or not CHANNEL_ID_ENV:
+    raise RuntimeError("TOKEN ili CHANNEL_ID nisu postavljeni u Environment Variables!")
 
 try:
     CHANNEL_ID = int(CHANNEL_ID_ENV)
 except ValueError:
-    raise RuntimeError("CHANNEL_ID mora biti BROJ!")
+    raise RuntimeError("CHANNEL_ID mora biti broj!")
 
-# ------------------------------
-# Konfiguracija bota
-# ------------------------------
-URL = "https://winpoint.gg"
-
+# Intenti za bota
 intents = discord.Intents.default()
-intents.message_content = True  # neophodno za slanje poruka
+intents.message_content = True
 
 client = discord.Client(intents=intents)
 
-old_page = ""  # čuvanje stare stranice
+# Koristimo hash ili dužinu teksta za poređenje da ne bismo čuvali preogromne stringove
+old_content_hash = None
 
 # ------------------------------
-# Funkcija za dobavljanje stranice
+# Funkcija za proveru stranice (Asinhrona)
 # ------------------------------
-def get_page():
+async def fetch_page():
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+    }
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = requests.get(URL, headers=headers, timeout=10)
-        return r.text
+        async with aiohttp.ClientSession() as session:
+            async with session.get(URL, headers=headers, timeout=15) as response:
+                if response.status == 200:
+                    return await response.text()
+                else:
+                    print(f"Sajt vratio status: {response.status}")
+                    return None
     except Exception as e:
-        print("HTTP GREŠKA:", e)
+        print(f"Greška prilikom konekcije: {e}")
         return None
 
 # ------------------------------
-# Kada bot bude spreman
-# ------------------------------
-@client.event
-async def on_ready():
-    print(f"Bot je online kao {client.user}")
-    # Startuje check loop
-    asyncio.create_task(check_loop())
-
-# ------------------------------
-# Glavni loop za proveru stranice
+# Glavni loop
 # ------------------------------
 async def check_loop():
-    global old_page
+    global old_content_hash
     await client.wait_until_ready()
-
+    
     channel = client.get_channel(CHANNEL_ID)
-    if channel is None:
-        raise RuntimeError(f"Ne mogu da nadjem kanal sa ID {CHANNEL_ID}. Proveri permissions i ID!")
+    if not channel:
+        print(f"Greška: Kanal {CHANNEL_ID} nije pronađen!")
+        return
 
-    print(f"Bot će slati poruke u kanal: {channel.name} ({CHANNEL_ID})")
+    print(f"Monitoring pokrenut za kanal: {channel.name}")
 
-    while True:
-        page = get_page()
-        if page is not None:
-            if old_page and page != old_page:
+    while not client.is_closed():
+        new_page = await fetch_page()
+        
+        if new_page:
+            # Uzimamo samo deo sadržaja ili hash radi stabilnosti
+            # Ovde poredimo ceo text, ali koristimo hash da uštedimo memoriju
+            current_hash = hash(new_page)
+
+            if old_content_hash is not None and current_hash != old_content_hash:
                 try:
-                    await channel.send("@everyone 🆕 New matches are added on winpoint.gg")
+                    await channel.send("🆕 **Novi mečevi su dodati na winpoint.gg!** @everyone")
+                    print("Poruka poslata!")
                 except Exception as e:
-                    print("GREŠKA prilikom slanja poruke:", e)
-            old_page = page
-        # čekaj 60 sekundi pre sledeće provere
-        await asyncio.sleep(60)
+                    print(f"Greška pri slanju: {e}")
+            
+            old_content_hash = current_hash
+        
+        # Provera na svakih 5 minuta (bolje za Railway i manje šanse za Ban)
+        await asyncio.sleep(300) 
 
-# ------------------------------
-# Pokretanje bota
-# ------------------------------
-client.run(TOKEN)
+@client.event
+async def on_ready():
+    print(f"Bot online: {client.user}")
+    # Pokrećemo loop kao task
+    client.loop.create_task(check_loop())
+
+# Pokretanje
+try:
+    client.run(TOKEN)
+except Exception as e:
+    print(f"Bot se ugasio: {e}")
