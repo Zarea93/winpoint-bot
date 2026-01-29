@@ -2,13 +2,23 @@ import discord
 from discord.ext import tasks
 import aiohttp
 import os
+from flask import Flask
+from threading import Thread
 
-# ČITANJE PODATAKA IZ RAILWAY-A (Ne diraj ovo)
-TOKEN = os.getenv("TOKEN")
-try:
-    CHANNEL_ID = int(os.getenv("CHANNEL_ID"))
-except:
-    CHANNEL_ID = None
+# --- MINIMALNI WEB SERVER ---
+app = Flask('')
+@app.route('/')
+def home():
+    return "Bot je online!"
+
+def run_web():
+    # Railway će automatski dodeliti PORT, mi ga samo slušamo
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+# --- TVOJI PODACI (DIREKTNO) ---
+TOKEN = "OVDE_ZALEPI_SVOJ_NOVI_TOKEN"
+CHANNEL_ID = 123456789012345678  # OVDE ZALEPI BROJ KANALA (BEZ NAVODNIKA)
 
 class WinpointBot(discord.Client):
     def __init__(self):
@@ -25,12 +35,8 @@ class WinpointBot(discord.Client):
 
     @tasks.loop(minutes=5)
     async def check_site(self):
-        if not self.is_ready() or not CHANNEL_ID:
-            return
         channel = self.get_channel(CHANNEL_ID)
-        if not channel:
-            print(f"GRESKA: Kanal sa ID {CHANNEL_ID} nije pronadjen!")
-            return
+        if not channel: return
         try:
             headers = {"User-Agent": "Mozilla/5.0"}
             async with aiohttp.ClientSession() as session:
@@ -39,13 +45,17 @@ class WinpointBot(discord.Client):
                         text = await resp.text()
                         curr_hash = hash(text)
                         if self.old_hash is not None and curr_hash != self.old_hash:
-                            await channel.send("🆕 **New matches are added on winpoint.gg!** @everyone")
+                            await channel.send("🆕 **Novi mečevi na winpoint.gg!** @everyone")
                         self.old_hash = curr_hash
-        except Exception as e:
-            print(f"Greska pri proveri sajta: {e}")
+        except:
+            pass
 
-bot = WinpointBot()
-if TOKEN:
+# --- POKRETANJE SVEGA ---
+if __name__ == "__main__":
+    # 1. Pokrećemo web server u posebnom "thread-u" (pozadini)
+    t = Thread(target=run_web)
+    t.start()
+    
+    # 2. Pokrećemo bota
+    bot = WinpointBot()
     bot.run(TOKEN)
-else:
-    print("FATALNA GRESKA: TOKEN varijabla nije pronadjena u Railway panelu!")
