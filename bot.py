@@ -17,8 +17,8 @@ def run_web():
     app.run(host='0.0.0.0', port=port)
 
 # --- TVOJI PODACI (DIREKTNO) ---
-TOKEN = "OVDE_ZALEPI_SVOJ_NOVI_TOKEN"
-CHANNEL_ID = 123456789012345678  # OVDE ZALEPI BROJ KANALA (BEZ NAVODNIKA)
+TOKEN = "MTQ2NjMzNjk5MDEyNjQwNzczMQ.G8Cf9r.zMBLQLPLtz5hLerm2vh6bT8ZD6CVwOpTRfiELk"
+CHANNEL_ID = 123456789012345678  # 1365627989987033098
 
 class WinpointBot(discord.Client):
     def __init__(self):
