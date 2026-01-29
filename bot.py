@@ -1,93 +1,57 @@
 import discord
+from discord.ext import tasks
 import aiohttp
-import asyncio
 import os
+import sys
 
-# ------------------------------
-# Konfiguracija
-# ------------------------------
+# --- DEBUG SEKCIJA ---
 TOKEN = os.getenv("TOKEN")
-CHANNEL_ID_ENV = os.getenv("CHANNEL_ID")
-URL = "https://winpoint.gg"
+CHANNEL_ID = os.getenv("CHANNEL_ID")
 
-if not TOKEN or not CHANNEL_ID_ENV:
-    raise RuntimeError("TOKEN ili CHANNEL_ID nisu postavljeni u Environment Variables!")
+print("--- PROVERA SISTEMA ---")
+print(f"Python verzija: {sys.version}")
+print(f"Da li je TOKEN pronadjen: {'DA' if TOKEN else 'NE'}")
+print(f"Vrednost CHANNEL_ID: {CHANNEL_ID}")
+print("-----------------------")
 
-try:
-    CHANNEL_ID = int(CHANNEL_ID_ENV)
-except ValueError:
-    raise RuntimeError("CHANNEL_ID mora biti broj!")
+if not TOKEN or not CHANNEL_ID:
+    print("ERROR: Varijable nisu ucitane! Proveri Railway panel.")
+    # Necemo raise-ovati error odmah da bot ne bi stalno restartovao u krug
+    # vec cemo ga pustiti da stoji upaljen kako bi mogao da procitas logove
+    TOKEN = "RESTARTUJ_ME" 
 
-# Intenti za bota
-intents = discord.Intents.default()
-intents.message_content = True
+class MyBot(discord.Client):
+    def __init__(self):
+        intents = discord.Intents.default()
+        intents.message_content = True
+        super().__init__(intents=intents)
+        self.old_hash = None
 
-client = discord.Client(intents=intents)
+    async def setup_hook(self):
+        self.check_website.start()
 
-# Koristimo hash ili dužinu teksta za poređenje da ne bismo čuvali preogromne stringove
-old_content_hash = None
-
-# ------------------------------
-# Funkcija za proveru stranice (Asinhrona)
-# ------------------------------
-async def fetch_page():
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(URL, headers=headers, timeout=15) as response:
-                if response.status == 200:
-                    return await response.text()
-                else:
-                    print(f"Sajt vratio status: {response.status}")
-                    return None
-    except Exception as e:
-        print(f"Greška prilikom konekcije: {e}")
-        return None
-
-# ------------------------------
-# Glavni loop
-# ------------------------------
-async def check_loop():
-    global old_content_hash
-    await client.wait_until_ready()
-    
-    channel = client.get_channel(CHANNEL_ID)
-    if not channel:
-        print(f"Greška: Kanal {CHANNEL_ID} nije pronađen!")
-        return
-
-    print(f"Monitoring pokrenut za kanal: {channel.name}")
-
-    while not client.is_closed():
-        new_page = await fetch_page()
+    @tasks.loop(minutes=5)
+    async def check_website(self):
+        if not self.is_ready() or TOKEN == "RESTARTUJ_ME":
+            return
         
-        if new_page:
-            # Uzimamo samo deo sadržaja ili hash radi stabilnosti
-            # Ovde poredimo ceo text, ali koristimo hash da uštedimo memoriju
-            current_hash = hash(new_page)
+        channel = self.get_channel(int(CHANNEL_ID))
+        if channel:
+            try:
+                headers = {"User-Agent": "Mozilla/5.0"}
+                async with aiohttp.ClientSession() as session:
+                    async with session.get("https://winpoint.gg", headers=headers, timeout=15) as resp:
+                        if resp.status == 200:
+                            html = await resp.text()
+                            new_hash = hash(html)
+                            if self.old_hash is not None and new_hash != self.old_hash:
+                                await channel.send("🆕 **Novi mečevi na winpoint.gg!** @everyone")
+                            self.old_hash = new_hash
+            except Exception as e:
+                print(f"Greška: {e}")
 
-            if old_content_hash is not None and current_hash != old_content_hash:
-                try:
-                    await channel.send("🆕 **Novi mečevi su dodati na winpoint.gg!** @everyone")
-                    print("Poruka poslata!")
-                except Exception as e:
-                    print(f"Greška pri slanju: {e}")
-            
-            old_content_hash = current_hash
-        
-        # Provera na svakih 5 minuta (bolje za Railway i manje šanse za Ban)
-        await asyncio.sleep(300) 
-
-@client.event
-async def on_ready():
-    print(f"Bot online: {client.user}")
-    # Pokrećemo loop kao task
-    client.loop.create_task(check_loop())
-
-# Pokretanje
+bot = MyBot()
 try:
-    client.run(TOKEN)
+    bot.run(TOKEN)
 except Exception as e:
-    print(f"Bot se ugasio: {e}")
+    print(f"Bot nije mogao da se pokrene: {e}")
