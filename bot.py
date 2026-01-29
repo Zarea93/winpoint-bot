@@ -39,7 +39,7 @@ class WinpointBot(discord.Client):
                         text = await resp.text()
                         curr_hash = hash(text)
                         if self.old_hash is not None and curr_hash != self.old_hash:
-                            await channel.send("🆕 **Novi mečevi na winpoint.gg!** @everyone")
+                            await channel.send("🆕 **New matches are added on winpoint.gg!** @everyone")
                         self.old_hash = curr_hash
         except Exception as e:
             print(f"Greska pri proveri sajta: {e}")
