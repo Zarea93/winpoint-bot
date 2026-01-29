@@ -17,7 +17,7 @@ def run_web():
     app.run(host='0.0.0.0', port=port)
 
 # --- TVOJI PODACI (DIREKTNO) ---
-TOKEN = "MTQ2NjMzNjk5MDEyNjQwNzczMQ.G8Cf9r.zMBLQLPLtz5hLerm2vh6bT8ZD6CVwOpTRfiELk"
+TOKEN = os.getenv"MTQ2NjMzNjk5MDEyNjQwNzczMQ.G8Cf9r.zMBLQLPLtz5hLerm2vh6bT8ZD6CVwOpTRfiELk"
 CHANNEL_ID = 123456789012345678  # 1365627989987033098
 
 class WinpointBot(discord.Client):
