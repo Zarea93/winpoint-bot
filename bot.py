@@ -9,9 +9,15 @@ channel_id_env = os.getenv("CHANNEL_ID")
 
 # Provera da li su postavljene
 if not TOKEN:
-    print("GREŠKA: TOKEN nije postavljen u Environment Variables!")
+    raise RuntimeError("TOKEN nije postavljen u Environment Variables")
+
 if not channel_id_env:
-    print("GREŠKA: CHANNEL_ID nije postavljen u Environment Variables!")
+    raise RuntimeError("CHANNEL_ID nije postavljen u Environment Variables")
+
+try:
+    CHANNEL_ID = int(channel_id_env)
+except ValueError:
+    raise RuntimeError("CHANNEL_ID mora biti BROJ")
 
 try:
     CHANNEL_ID = int(channel_id_env)
